@@ -27,6 +27,7 @@ public class FastCollinearPoints {
             this.inputPoints[i] = points[i];
         }
         this.noOfSegments = 0;
+        Arrays.sort(this.inputPoints);
     }
 
     public int numberOfSegments() {
@@ -35,8 +36,8 @@ public class FastCollinearPoints {
 
     public LineSegment[] segments() {
         if (this.inputPoints.length < 4) return new LineSegment[0];
-        Point[] segmentPairs = new Point[2];
         int index = 0;
+        LineSegment[] segments = new LineSegment[1];
 
         for (int i = 0; i < this.inputPoints.length; i++) {
             Point referencePoint = this.inputPoints[i];
@@ -44,105 +45,55 @@ public class FastCollinearPoints {
             Point[] sortedPointsWithReferencePoint = this.inputPoints.clone();
             Arrays.sort(sortedPointsWithReferencePoint, referencePointComparator);
 
-            // Check for slope with each point
+
+            double ignoreSlope = Double.NEGATIVE_INFINITY;
             Point nextPoint = sortedPointsWithReferencePoint[1];
-            double referenceSlope = referencePoint.slopeTo(nextPoint);
+            Point lastPointOnSegment = nextPoint;
+            double commonSlope = referencePoint.slopeTo(nextPoint);
             int collinearPoints = 2;
-            // Create points that would be ends of line segment
-            Point nearPoint;
-            Point farPoint;
-            if (referencePoint.compareTo(nextPoint) < 0) {
-                nearPoint = referencePoint;
-                farPoint = nextPoint;
-            }
-            else {
-                nearPoint = nextPoint;
-                farPoint = referencePoint;
+            if (referencePoint.compareTo(nextPoint) > 0) {
+                ignoreSlope = commonSlope;
             }
 
-            // Iterate over points to check for collinearity
-            for (int j = 2; j < sortedPointsWithReferencePoint.length; j++) {
+
+            for (int j = 0; j < sortedPointsWithReferencePoint.length; j++) {
                 nextPoint = sortedPointsWithReferencePoint[j];
-                double slopeWithIteratedPoint = referencePoint.slopeTo(nextPoint);
-                if (slopeWithIteratedPoint == referenceSlope) {
+                double nextPointSlope = referencePoint.slopeTo(nextPoint);
+                if (nextPointSlope == ignoreSlope) {
+                    continue;
+                }
+                if (referencePoint.compareTo(nextPoint) > 0) {
+                    ignoreSlope = nextPointSlope;
+                }
+                if (nextPointSlope == commonSlope) {
                     collinearPoints++;
-                    if (nextPoint.compareTo(farPoint) > 0) {
-                        farPoint = nextPoint;
-                    }
-                    if (nextPoint.compareTo(nearPoint) < 0) {
-                        nearPoint = nextPoint;
-                    }
+                    lastPointOnSegment = nextPoint;
                 }
                 else {
-                    // Add point pair to the segmentPair array if it doesn't exist already.
-                    if (collinearPoints >= 4 && !this
-                            .checkPairExists(segmentPairs, nearPoint, farPoint)) {
-                        if (index >= segmentPairs.length) {
-                            segmentPairs = this.increaseArrayLength(segmentPairs);
+                    if (collinearPoints >= 4) {
+                        if (index == segments.length) {
+                            segments = this.increaseArrayLength(segments);
                         }
-                        segmentPairs[index++] = nearPoint;
-                        segmentPairs[index++] = farPoint;
-
+                        segments[index++] = new LineSegment(referencePoint, lastPointOnSegment);
                     }
-
-                    // Reset nearPoint, farPoint, collinearPairs and referenceSlope wrt to the new point.
+                    commonSlope = nextPointSlope;
                     collinearPoints = 2;
-                    referenceSlope = slopeWithIteratedPoint;
-                    if (referencePoint.compareTo(nextPoint) < 0) {
-                        nearPoint = referencePoint;
-                        farPoint = nextPoint;
-                    }
-                    else {
-                        nearPoint = nextPoint;
-                        farPoint = referencePoint;
-                    }
                 }
             }
-
-            // For Vertical Points (array iteration over and there must be a pair forming which is not added)
-            if (collinearPoints >= 4 && !this.checkPairExists(segmentPairs, nearPoint, farPoint)) {
-                if (index >= segmentPairs.length) {
-                    segmentPairs = this.increaseArrayLength(segmentPairs);
+            if (collinearPoints >= 4) {
+                if (index == segments.length) {
+                    segments = this.increaseArrayLength(segments);
                 }
-                segmentPairs[index++] = nearPoint;
-                segmentPairs[index++] = farPoint;
-
+                segments[index++] = new LineSegment(referencePoint, lastPointOnSegment);
             }
         }
-        segmentPairs = Arrays.copyOfRange(segmentPairs, 0, index);
-        LineSegment[] segments = this.generateLineSegments(segmentPairs);
-        this.noOfSegments = segments.length;
+        segments = Arrays.copyOfRange(segments, 0, index);
         return segments;
     }
 
-    private LineSegment[] generateLineSegments(Point[] segmentPairs) {
-        LineSegment[] segments = new LineSegment[segmentPairs.length / 2];
-        int index = 0;
-        for (int i = 0; i < segmentPairs.length - 1; i += 2) {
-            Point first = segmentPairs[i];
-            Point second = segmentPairs[i + 1];
-            if (first != null && second != null) {
-                segments[index++] = new LineSegment(first, second);
-            }
-        }
-        return segments;
-    }
 
-    private boolean checkPairExists(Point[] segmentPairs, Point nearPoint, Point farPoint) {
-        for (int i = 0; i < segmentPairs.length - 1; i += 2) {
-            Point first = segmentPairs[i];
-            Point second = segmentPairs[i + 1];
-            if (first != null && second != null) {
-                if (first.compareTo(nearPoint) == 0 && second.compareTo(farPoint) == 0) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private Point[] increaseArrayLength(Point[] inputArray) {
-        Point[] newArray = new Point[inputArray.length * 2];
+    private LineSegment[] increaseArrayLength(LineSegment[] inputArray) {
+        LineSegment[] newArray = new LineSegment[inputArray.length * 2];
         for (int i = 0; i < inputArray.length; i++) {
             newArray[i] = inputArray[i];
         }
